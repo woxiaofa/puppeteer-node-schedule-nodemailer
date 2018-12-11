@@ -49,6 +49,7 @@ klren0312的提醒
 //pup.js中加一句路径的引导
 
 ```
+
 const browser = await puppeteer.launch({
       executablePath: '/usr/bin/google-chrome' //自己的浏览器的路径
       })
