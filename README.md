@@ -1,6 +1,8 @@
 # puppeteer-node-schedule-nodemailer
 用node-schedule每天执行puppeteer截图nodemailer发邮件给需要的人
 
+仔细研究研究puppeteer也可以每天爬指定网站的内容发给到需要的邮箱哦
+
 之前的https://github.com/woxiaofa/node-schedule-pageres-nodemailer
 截图vue做的网站是空白所以改用了PUPPETEER
 
