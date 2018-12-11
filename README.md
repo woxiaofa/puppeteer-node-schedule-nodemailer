@@ -52,7 +52,8 @@ klren0312的提醒
 const browser = await puppeteer.launch({
       executablePath: '/usr/bin/google-chrome' //自己的浏览器的路径
       })
-
+      
+```
 
 //ps 自己这次尝试用了nohup node pup.js & 这种方法来后台执行命令，这么简单的东西百度就可以了，之前研究了好久 
 
