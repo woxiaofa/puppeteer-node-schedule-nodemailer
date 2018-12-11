@@ -1,7 +1,8 @@
 # puppeteer-node-schedule-nodemailer
 用node-schedule每天执行puppeteer截图nodemailer发邮件给需要的人
 
-之前的https://github.com/woxiaofa/node-schedule-pageres-nodemailer截图vue做的网站是空白所以改用了PUPPETEER
+之前的https://github.com/woxiaofa/node-schedule-pageres-nodemailer
+截图vue做的网站是空白所以改用了PUPPETEER
 
 ### 感谢
 klren0312的提醒
@@ -43,13 +44,15 @@ klren0312的提醒
 2.在centos上Chromium用cnpm也安装不成功，改用chrome
 ```
 ### 本地路径设置方法，和换浏览器核心的修改方法
+
 ```
 //pup.js中加一句路径的引导
+
 ```
 const browser = await puppeteer.launch({
-      executablePath: '/usr/bin/google-chrome'
+      executablePath: '/usr/bin/google-chrome' //自己的浏览器的路径
       })
 
-```
 
+//ps 自己这次尝试用了nohup node pup.js & 这种方法来后台执行命令，这么简单的东西百度就可以了，之前研究了好久 
 
