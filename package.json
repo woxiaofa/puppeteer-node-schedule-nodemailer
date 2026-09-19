@@ -1,16 +1,47 @@
 {
-  "name": "pup",
-  "version": "1.0.0",
-  "description": "公司网站截图node脚本",
-  "main": "pup.js",
-  "author": "wxf",
-  "license": "ISC",
-  "dependencies": {
-    "node-schedule": "^1.3.0",
-    "nodemailer": "^4.6.6",
-    "puppeteer": "^1.11.0"
+  "name": "puppeteer-node-schedule-nodemailer",
+  "version": "2.0.0",
+  "description": "Scheduled Puppeteer website screenshots (desktop & mobile) delivered by email via Nodemailer / 定时用 Puppeteer 给网站截图（PC + 移动端）并用 Nodemailer 自动发邮件",
+  "main": "src/index.js",
+  "bin": {
+    "site-shot": "src/index.js"
   },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "puppeteer",
+    "node-schedule",
+    "nodemailer",
+    "screenshot",
+    "cron",
+    "website-monitoring",
+    "scheduler",
+    "截图",
+    "定时任务",
+    "邮件",
+    "网站监控"
+  ],
+  "author": "woxiaofa",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/woxiaofa/puppeteer-node-schedule-nodemailer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/woxiaofa/puppeteer-node-schedule-nodemailer/issues"
+  },
+  "homepage": "https://github.com/woxiaofa/puppeteer-node-schedule-nodemailer#readme",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node src/index.js",
+    "once": "node src/index.js --once",
+    "dry-run": "node src/index.js --once --dry-run",
+    "check": "node src/index.js --check"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.1",
+    "node-schedule": "^2.1.1",
+    "nodemailer": "^10.0.10",
+    "puppeteer": "^24.43.1"
   }
 }
