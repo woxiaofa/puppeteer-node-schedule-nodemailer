@@ -1,0 +1,16 @@
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# 运行环境 / 私密配置
+.env
+.env.local
+
+# 运行产物
+screenshots/
+logs/
+config/sites.local.js
+
+.DS_Store
+Thumbs.db
+*.log
