@@ -36,10 +36,13 @@
     "start": "node src/index.js",
     "once": "node src/index.js --once",
     "dry-run": "node src/index.js --once --dry-run",
-    "check": "node src/index.js --check"
+    "check": "node src/index.js --check",
+    "doctor:mail": "node src/diagnose.js",
+    "web": "node src/server.js"
   },
   "dependencies": {
     "dotenv": "^18.0.1",
+    "express": "^5.2.1",
     "node-schedule": "^2.1.1",
     "nodemailer": "^10.0.10",
     "puppeteer": "^24.43.1"
