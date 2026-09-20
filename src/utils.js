@@ -108,8 +108,69 @@ function stamp(date = new Date(), withTime = false) {
   return withTime ? `${day}_${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}` : day
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/** 是否合法邮箱 / plain address check */
+const isEmail = (value) => EMAIL_RE.test(String(value || '').trim())
+
+/** 允许 `名字 <a@b.com>` 形式 / accepts "Name <a@b.com>" */
+function isAddress(value) {
+  const text = String(value || '').trim()
+  if (!text) return false
+  const angle = text.match(/<([^>]+)>\s*$/)
+  return isEmail(angle ? angle[1] : text)
+}
+
+/** 从收件人列表里挑出不合法的项 / pick invalid entries from a recipient list */
+const invalidAddresses = (list) => (Array.isArray(list) ? list : []).filter((item) => !isAddress(item))
+
+const HOST_RE = /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$/
+const isHostname = (value) => HOST_RE.test(String(value || '').trim()) && !/:\/\//.test(String(value || ''))
+const isValidTimeZone = (tz) => {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: String(tz || '') })
+    return !!tz
+  } catch (_) {
+    return false
+  }
+}
+const isValidCron = (value) => /^(\S+\s+){4}\S+$/.test(String(value || '').trim())
+const isValidUrl = (value) => {
+  try {
+    const url = new URL(String(value || '').trim())
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch (_) {
+    return false
+  }
+}
+const isInt = (value, min, max) => {
+  const n = Number(value)
+  return Number.isFinite(n) && Number.isInteger(n) && n >= min && n <= max
+}
+
+/** 读取日志文件末尾 n 行 / tail the last n lines of a log file */
+function tailLines(file, n = 200) {
+  if (!file) return []
+  try {
+    if (!fs.existsSync(file)) return []
+    const content = fs.readFileSync(file, 'utf8')
+    return content.split(/\r?\n/).filter(Boolean).slice(-n)
+  } catch (_) {
+    return []
+  }
+}
+
 module.exports = {
   sleep,
+  tailLines,
+  isEmail,
+  isAddress,
+  invalidAddresses,
+  isHostname,
+  isValidTimeZone,
+  isValidCron,
+  isValidUrl,
+  isInt,
   withTimeout,
   retry,
   ensureDir,

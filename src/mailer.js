@@ -85,12 +85,46 @@ function buildAttachments(summary, maxBytes, logger) {
 }
 
 /**
- * 发送邮件报告：先验证 SMTP（快速失败），再指数退避重试发送。
- * Send the report: verify SMTP first (fail fast), then retry with backoff.
+ * 把发信错误翻译成可执行的排查建议，避免日志里只有一句“超时”。
+ * Translate mail errors into actionable hints instead of a bare "timeout".
  */
-async function sendReport({ config, summary, logger }) {
-  const mail = config.mail
-  const transporter = nodemailer.createTransport({
+function enhanceError(err, mail) {
+  const code = err.code || err.responseCode || ''
+  const hints = []
+  if (code === 'ETIMEDOUT' || /timeout|超时/i.test(err.message)) {
+    hints.push(`连不上 ${mail.host}:${mail.port}：检查 SMTP 地址是否少了 smtp. 前缀、本机/服务器防火墙是否封了该出口端口`)
+  }
+  if (code === 'EAUTH' || /535|Username and Password|Invalid login/i.test(err.message)) {
+    hints.push('账号或密码错误：QQ/163/Gmail 必须用“授权码/应用专用密码”，账号要写完整邮箱地址')
+  }
+  if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') {
+    hints.push('SMTP 域名解析失败：SMTP 地址写错了')
+  }
+  if (code === 'ECONNREFUSED') {
+    hints.push('端口拒绝连接：确认端口与加密方式匹配（465 勾选 SSL，587 不勾选）')
+  }
+  if (code === 'ESOCKET' || /wrong version number/i.test(err.message)) {
+    hints.push('加密方式不匹配：SSL 端口要用 secure=true，STARTTLS 端口要用 secure=false')
+  }
+  if (code === 'EENVELOPE' || /No recipients defined/i.test(err.message)) {
+    hints.push(
+      `收件人无效或为空（当前：${(mail.to || []).join(', ') || '空'}）：请填写真实邮箱地址，例如 name@example.com`
+    )
+  }
+  if (/Invalid recipient|User unknown/i.test(err.message)) {
+    hints.push('收件人地址被服务器拒绝：确认邮箱地址是否正确')
+  }
+  hints.push('可执行 npm run doctor:mail 做逐层自检')
+  const enhanced = new Error(
+    [`${err.message}（${code ? code + '，' : ''}${mail.host}:${mail.port} secure=${mail.secure}）`, ...hints].join(' | ')
+  )
+  enhanced.code = code
+  enhanced.cause = err
+  return enhanced
+}
+
+function createTransporter(mail) {
+  return nodemailer.createTransport({
     host: mail.host,
     port: mail.port,
     secure: mail.secure,
@@ -99,6 +133,15 @@ async function sendReport({ config, summary, logger }) {
     greetingTimeout: mail.timeoutMs,
     socketTimeout: mail.timeoutMs * 2
   })
+}
+
+/**
+ * 发送邮件报告：先验证 SMTP（快速失败），再指数退避重试发送。
+ * Send the report: verify SMTP first (fail fast), then retry with backoff.
+ */
+async function sendReport({ config, summary, logger }) {
+  const mail = config.mail
+  const transporter = createTransporter(mail)
 
   try {
     await withTimeout(transporter.verify(), mail.timeoutMs, 'SMTP 连接/登录超时')
@@ -129,6 +172,8 @@ async function sendReport({ config, summary, logger }) {
 
     logger.info(`邮件发送成功：${info.messageId || info.response}`)
     return info
+  } catch (err) {
+    throw enhanceError(err, mail)
   } finally {
     try {
       transporter.close()
@@ -138,4 +183,33 @@ async function sendReport({ config, summary, logger }) {
   }
 }
 
-module.exports = { sendReport, buildText }
+/** 界面上的“发送测试邮件” / "Send test mail" button in the web UI */
+async function sendTestMail({ config, logger }) {
+  const mail = config.mail
+  if (!mail.enabled) throw new Error('邮件配置不完整（host / user / pass / 收件人）')
+  if (!mail.to.length) throw new Error('收件人为空：请在「邮件配置」里填写至少一个邮箱地址')
+  const transporter = createTransporter(mail)
+  try {
+    await withTimeout(transporter.verify(), mail.timeoutMs, 'SMTP 连接/登录超时')
+    const info = await transporter.sendMail({
+      from: mail.from || mail.user,
+      to: mail.to.join(', '),
+      subject: `${mail.subjectPrefix} · 测试邮件 / test mail`,
+      text: `这是一封来自 site-shot 的测试邮件，收到说明邮件配置正确。\n时间：${new Date().toLocaleString('zh-CN', {
+        hour12: false
+      })}\n收件人：${mail.to.join(', ')}`
+    })
+    logger.info(`测试邮件发送成功：${info.messageId || info.response}`)
+    return info
+  } catch (err) {
+    throw enhanceError(err, mail)
+  } finally {
+    try {
+      transporter.close()
+    } catch (_) {
+      /* ignore */
+    }
+  }
+}
+
+module.exports = { sendReport, sendTestMail, buildText, enhanceError }

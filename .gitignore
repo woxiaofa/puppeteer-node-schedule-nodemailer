@@ -2,9 +2,10 @@ node_modules/
 npm-debug.log*
 yarn-error.log*
 
-# 运行环境 / 私密配置
+# 运行环境 / 私密配置（含界面保存的邮箱密码）
 .env
 .env.local
+data/
 
 # 运行产物
 screenshots/

@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>site-shot 控制台 / Dashboard</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">◉</span>
+        <strong>site-shot</strong>
+        <span class="sub">网站定时截图控制台 / screenshot scheduler</span>
+      </div>
+      <div class="status">
+        <span id="chip-run" class="chip">空闲</span>
+        <span id="chip-next" class="chip chip-soft">下次执行：-</span>
+        <span id="chip-mail" class="chip chip-soft">邮件：-</span>
+        <button id="btn-run" class="btn primary">立即执行</button>
+        <button id="btn-save" class="btn">保存配置</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <nav class="side">
+        <button class="nav-item active" data-tab="overview">概览</button>
+        <button class="nav-item" data-tab="schedule">定时任务</button>
+        <button class="nav-item" data-tab="sites">站点与尺寸</button>
+        <button class="nav-item" data-tab="capture">截图参数</button>
+        <button class="nav-item" data-tab="mail">邮件配置</button>
+        <button class="nav-item" data-tab="history">历史记录</button>
+        <button class="nav-item" data-tab="logs">运行日志</button>
+      </nav>
+
+      <main class="content">
+        <section class="panel active" data-panel="overview">
+          <div class="cards">
+            <div class="card"><span class="label">站点数量</span><span class="value" id="stat-sites">-</span></div>
+            <div class="card"><span class="label">下次执行</span><span class="value" id="stat-next">-</span></div>
+            <div class="card"><span class="label">上次结果</span><span class="value" id="stat-last">-</span></div>
+            <div class="card"><span class="label">邮件状态</span><span class="value" id="stat-mail">-</span></div>
+          </div>
+
+          <div class="card block">
+            <h3>快速操作 / Quick actions</h3>
+            <div class="row">
+              <button id="btn-run2" class="btn primary">立即执行一次截图</button>
+              <button id="btn-test-mail2" class="btn">发送测试邮件</button>
+              <button id="btn-reload" class="btn ghost">重新加载配置</button>
+            </div>
+            <p class="hint">
+              配置保存在 <code id="cfg-path">data/config.json</code>，界面保存后立即生效并重新加载定时规则。
+            </p>
+            <p class="hint">截图输出目录：<code id="out-path">screenshots</code></p>
+          </div>
+
+          <div class="card block">
+            <h3>最近一次运行 / Last run</h3>
+            <div id="last-run" class="muted">暂无记录</div>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="schedule">
+          <div class="card block">
+            <h3>定时规则 / Schedule</h3>
+            <div class="grid">
+              <label class="field">
+                <span>cron 表达式</span>
+                <input id="cron" placeholder="30 9 * * *" />
+                <em>格式：分 时 日 月 周（5 段）</em>
+              </label>
+              <label class="field">
+                <span>时区</span>
+                <input id="timezone" list="tz-list" placeholder="Asia/Shanghai" />
+                <datalist id="tz-list">
+                  <option value="Asia/Shanghai"></option>
+                  <option value="Asia/Tokyo"></option>
+                  <option value="Asia/Singapore"></option>
+                  <option value="UTC"></option>
+                  <option value="America/New_York"></option>
+                  <option value="Europe/London"></option>
+                </datalist>
+                <em>影响 cron 与邮件时间显示</em>
+              </label>
+            </div>
+            <div class="row wrap">
+              <span class="muted">常用预设：</span>
+              <button class="btn tiny" data-cron="30 9 * * *">每天 09:30</button>
+              <button class="btn tiny" data-cron="0 9 * * 1-5">工作日 09:00</button>
+              <button class="btn tiny" data-cron="0 */6 * * *">每 6 小时</button>
+              <button class="btn tiny" data-cron="*/10 * * * *">每 10 分钟</button>
+            </div>
+            <label class="check">
+              <input type="checkbox" id="runOnStart" />
+              <span>服务启动时立即执行一次（RUN_ON_START）</span>
+            </label>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="sites">
+          <div class="card block">
+            <h3>截图站点 / Targets</h3>
+            <div class="table-head">
+              <span>名称</span><span>URL</span><span>宽</span><span>高</span><span>User-Agent</span>
+              <span>整页</span><span>等待元素</span><span></span>
+            </div>
+            <div id="site-rows"></div>
+            <div class="row">
+              <button id="btn-add-site" class="btn">+ 添加站点</button>
+              <button id="btn-add-mobile" class="btn ghost">+ 追加移动端副本</button>
+            </div>
+            <p class="hint">「整页」留空表示跟随全局设置；移动端建议填写 iPhone UA。</p>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="capture">
+          <div class="card block">
+            <h3>截图参数 / Capture options</h3>
+            <div class="grid">
+              <label class="field"><span>并发页面数</span><input id="concurrency" type="number" min="1" max="8" /></label>
+              <label class="field"><span>导航超时(ms)</span><input id="navigationTimeoutMs" type="number" min="3000" /></label>
+              <label class="field">
+                <span>等待策略 waitUntil</span>
+                <select id="waitUntil">
+                  <option value="networkidle2">networkidle2（推荐）</option>
+                  <option value="networkidle0">networkidle0</option>
+                  <option value="load">load</option>
+                  <option value="domcontentloaded">domcontentloaded</option>
+                </select>
+              </label>
+              <label class="field"><span>截图前额外等待(ms)</span><input id="extraWaitMs" type="number" min="0" /></label>
+              <label class="field"><span>失败重试次数</span><input id="retries" type="number" min="0" max="5" /></label>
+              <label class="field"><span>单图上限(MB)</span><input id="maxImageMb" type="number" min="1" max="50" /><em>超过自动降级为首屏</em></label>
+            </div>
+            <label class="check"><input type="checkbox" id="fullPage" /><span>整页截图（fullPage）</span></label>
+            <label class="check"><input type="checkbox" id="autoScroll" /><span>自动滚动触发懒加载</span></label>
+            <label class="field"><span>历史保留天数</span><input id="retentionDays" type="number" min="0" max="365" /><em>0 = 不清理</em></label>
+            <label class="field"><span>浏览器路径（可选）</span><input id="executablePath" placeholder="留空使用自带 Chromium" /><em>例如 C:\Program Files\Google\Chrome\Application\chrome.exe</em></label>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="mail">
+          <div class="card block">
+            <h3>邮件配置 / SMTP</h3>
+            <div class="grid">
+              <label class="field"><span>SMTP 服务器</span><input id="smtpHost" placeholder="smtp.exmail.qq.com" /></label>
+              <label class="field"><span>端口</span><input id="smtpPort" type="number" /></label>
+              <label class="field"><span>账号</span><input id="smtpUser" placeholder="your@email.com" /></label>
+              <label class="field"><span>密码 / 授权码</span><input id="smtpPass" type="password" /><em id="pass-hint">留空表示保持原密码不变</em></label>
+              <label class="field"><span>发件人</span><input id="mailFrom" placeholder="site-shot &lt;your@email.com&gt;" /></label>
+              <label class="field"><span>收件人（逗号分隔）</span><input id="mailTo" placeholder="a@example.com, b@example.com" /><em>必须是真实邮箱地址，否则发信时会报 No recipients defined</em></label>
+              <label class="field"><span>抄送（可选）</span><input id="mailCc" /></label>
+              <label class="field"><span>标题前缀</span><input id="subjectPrefix" /></label>
+              <label class="field"><span>附件上限(MB)</span><input id="maxAttachmentMb" type="number" min="1" max="50" /><em>超出只发文字报告</em></label>
+            </div>
+            <label class="check"><input type="checkbox" id="smtpSecure" /><span>使用 SSL/TLS（465 端口勾选；587 端口不勾选）</span></label>
+            <div class="row">
+              <button id="btn-test-mail" class="btn">发送测试邮件</button>
+              <button id="btn-diag-mail" class="btn ghost">诊断 SMTP 连接</button>
+              <span class="muted">未配置完整时只会在本地保存截图，不会发送邮件。</span>
+            </div>
+            <pre id="diag-box" class="log-box" hidden></pre>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="history">
+          <div class="card block">
+            <div class="row between">
+              <h3>历史记录 / History</h3>
+              <button id="btn-history" class="btn tiny">刷新</button>
+            </div>
+            <div id="history-list" class="muted">加载中…</div>
+          </div>
+          <div class="card block" id="history-detail-wrap" hidden>
+            <h3>运行详情 / Run detail</h3>
+            <div id="history-detail"></div>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="logs">
+          <div class="card block">
+            <div class="row between">
+              <h3>运行日志 / Logs</h3>
+              <div class="row">
+                <label class="check"><input type="checkbox" id="log-auto" /><span>自动刷新</span></label>
+                <button id="btn-logs" class="btn tiny">刷新</button>
+              </div>
+            </div>
+            <pre id="log-box" class="log-box">加载中…</pre>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast"></div>
+    <script src="validate.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

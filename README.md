@@ -20,6 +20,7 @@
 - [功能特性 / Features](#功能特性--features)
 - [项目结构 / Project structure](#项目结构--project-structure)
 - [快速开始 / Quick start](#快速开始--quick-start)
+- [Web 控制台 / Web dashboard](#web-控制台--web-dashboard)
 - [配置说明 / Configuration](#配置说明--configuration)
 - [自定义站点 / Customize targets](#自定义站点--customize-targets)
 - [命令行 / CLI](#命令行--cli)
@@ -47,6 +48,8 @@
 | 10 | 历史留档 + 自动清理 | 截图按 `screenshots/日期_时间/` 归档，超过 `RETENTION_DAYS` 自动清理 |
 | 11 | 邮件内嵌报告 / Inline report | 邮件正文直接展示截图 + 状态表格（站点、耗时、失败原因） |
 | 12 | 零配置也能跑 / Works without SMTP | 未配置邮箱时只截图保存本地，不报错退出 |
+| 13 | Web 控制台 / Web dashboard | 浏览器里配置邮箱、站点与尺寸、cron、截图参数，支持立即执行、历史回看、日志查看 |
+| 14 | 字段级校验 / Field validation | 前后端共用同一套校验规则，邮箱类字段强制邮箱格式，出错处标红并滚动定位 |
 
 ---
 
@@ -55,7 +58,11 @@
 ```
 .
 ├── src/
-│   ├── index.js      # 入口：CLI 参数、配置校验、定时任务、优雅退出
+│   ├── index.js      # CLI 入口：参数、配置校验、定时任务、优雅退出
+│   ├── server.js     # Web 控制台服务：REST API + 静态页面
+│   ├── scheduler.js  # 调度器：cron 注册、去重、热重载
+│   ├── store.js      # 界面配置的读取/校验/持久化（data/config.json）
+│   ├── history.js    # 运行历史读取
 │   ├── task.js       # 单次任务编排：截图 → 报告 → 发信 → 清理
 │   ├── capture.js    # 单站点截图：超时/重试/空白检测/降级
 │   ├── browser.js    # 浏览器会话：懒启动、断线重连、必关闭
@@ -66,6 +73,11 @@
 │   ├── index.js      # 统一配置（全部支持环境变量覆盖）+ 启动校验
 │   ├── sites.js      # 默认截图站点清单
 │   └── sites.local.js（可选，已被 git 忽略，用于本地覆盖站点）
+├── public/           # Web 控制台前端（原生 HTML/CSS/JS，无需打包）
+│   ├── index.html
+│   ├── style.css
+│   └── app.js
+├── data/config.json  # 界面保存的配置（自动生成，已 git 忽略）
 ├── .env.example      # 所有可配置项及说明
 └── screenshots/      # 运行产物（已 git 忽略）
 ```
@@ -91,6 +103,9 @@ npm run dry-run
 
 # 5. 常驻启动（按 SCHEDULE_CRON 定时执行）
 npm start
+
+# 6. 想可视化配置？启动 Web 控制台，浏览器打开 http://127.0.0.1:3000
+npm run web
 ```
 
 **English**
@@ -101,6 +116,7 @@ cp .env.example .env        # then edit it
 npm run check               # validate config only
 npm run dry-run             # capture once, no email
 npm start                   # run as a scheduled daemon
+npm run web                 # web dashboard at http://127.0.0.1:3000
 ```
 
 > 首次安装若 Chromium 下载失败，见 [常见问题](#常见问题--faq--troubleshooting)。
@@ -181,6 +197,54 @@ module.exports = [
 
 ---
 
+## Web 控制台 / Web dashboard
+
+**中文**
+
+```bash
+npm run web
+# 浏览器打开 / open http://127.0.0.1:3000
+```
+
+日常配置基本都能在界面里完成：
+
+| 页面 | 能做什么 / What it does |
+|---|---|
+| 概览 / Overview | 下次执行时间、上次结果、邮件状态；一键「立即执行」 |
+| 定时任务 / Schedule | cron（带常用预设按钮）、时区、启动时是否先跑一次 |
+| 站点与尺寸 / Sites | 增删改站点：名称、URL、宽/高、User-Agent、整页或首屏、等待元素；一键追加移动端副本 |
+| 截图参数 / Capture | 并发数、超时、等待策略、重试次数、单图上限、自动滚动、历史保留天数、浏览器路径 |
+| 邮件配置 / Mail | SMTP 主机/端口/SSL、账号与授权码、发件人、收件人、标题前缀，并可「发送测试邮件」 |
+| 历史记录 / History | 每次运行成功/失败清单 + 截图缩略图 |
+| 运行日志 / Logs | 查看最近日志，支持自动刷新 |
+
+- **保存即生效**：配置写入 `data/config.json`（优先级高于 `.env`），保存后立即重新加载 cron。
+- **密码处理**：邮箱密码只存本地文件，界面回显为掩码，留空表示不修改。
+
+**字段校验规则 / Validation rules**
+
+界面保存前先逐字段校验（出错位置标红 + 自动滚动定位），后端用同一份规则文件 `public/validate.js` 再校验一次（直接发 PUT 也躲不过）。命令行 `npm run check` 同样会校验。
+
+| 字段 | 规则 / Rule |
+|---|---|
+| 收件人 / 抄送 | 必须是合法邮箱；一旦填了邮件信息，收件人至少 1 个且必须是邮箱 |
+| SMTP 账号 | 必须是完整邮箱地址 |
+| 发件人 | 邮箱，或「名称 <邮箱>」形式 |
+| SMTP 服务器 / 端口 | 主机名形如 `smtp.xxx.com`（不能带 `http://`）、端口 1~65535 |
+| 密码 / 授权码 | 未保存过密码时必须填写；已保存时留空表示不修改 |
+| 站点 URL / 名称 | URL 必须 `http(s)://` 且含域名；名称必填 |
+| 站点视口 | 宽 320~3840、高 320~4320；站点列表不能为空；标识不可重复 |
+| cron / 时区 | 5 段 cron；IANA 时区（如 `Asia/Shanghai`） |
+| 数值类 | 并发 1~8、导航超时 3000~180000ms、额外等待 0~30000ms、重试 0~5、单图/附件 1~50MB、保留天数 0~365 |
+- **局域网/公网访问**：设置 `WEB_HOST=0.0.0.0`，并**务必**同时设置 `WEB_USER` / `WEB_PASS` 开启 Basic 认证。
+- **两种模式**：`npm start` 纯命令行常驻；`npm run web` 带界面常驻（同样按 cron 自动执行）。
+
+**English**
+
+`npm run web` → open <http://127.0.0.1:3000>: edit sites, viewports, SMTP and cron from the browser, trigger a run, browse history and tail logs. Settings persist to `data/config.json` (overrides `.env`) and the cron job reloads instantly. For LAN/public exposure set `WEB_HOST=0.0.0.0` **together with** `WEB_USER`/`WEB_PASS`.
+
+---
+
 ## 命令行 / CLI
 
 ```bash
@@ -191,7 +255,7 @@ node src/index.js --check     # 只校验配置 / validate config only
 node src/index.js --help      # 帮助 / help
 ```
 
-对应 npm 脚本：`npm start` / `npm run once` / `npm run dry-run` / `npm run check`。
+对应 npm 脚本：`npm start` / `npm run once` / `npm run dry-run` / `npm run check` / `npm run web`。
 
 退出码 / Exit codes（`--once` 模式，便于 crontab 或监控告警识别）：
 
@@ -219,7 +283,7 @@ This is where the project differs from a naive script: every failure mode has an
 | 浏览器崩溃 / 断开 | 下次取用浏览器时自动重启 Chromium |
 | 浏览器根本起不来 | 预检失败 → 立刻结束本轮，全部记失败（不会逐个站点空转重试） |
 | 附件超过邮箱上限 | 只发文字报告 + 状态表格，保证邮件一定能发出 |
-| SMTP 连不上 / 登录失败 | 先 `verify()` 快速失败，再重试 `MAIL_RETRIES` 次；仍失败则记录错误，**截图保留在磁盘** |
+| SMTP 连不上 / 登录失败 | 先 `verify()` 快速失败，再重试 `MAIL_RETRIES` 次；仍失败则记录带错误码和排查建议的日志，**截图保留在磁盘**；可用 `npm run doctor:mail` 逐层自检 |
 | 上一轮还没跑完 | 跳过本轮触发，避免任务叠加拖垮机器 |
 | 页面/浏览器泄漏 | `try/finally` 必关页面与浏览器，退出时兜底 `SIGKILL` |
 | 进程被 Ctrl+C / kill | 捕获 `SIGINT`/`SIGTERM`，取消定时任务并等待当前轮次收尾 |
@@ -243,7 +307,8 @@ This is where the project differs from a naive script: every failure mode has an
 ```bash
 # 方式一：进程常驻（推荐，配合 pm2 自动重启）
 npm i -g pm2
-pm2 start src/index.js --name site-shot --time
+pm2 start src/index.js --name site-shot --time    # 纯命令行
+pm2 start src/server.js --name site-shot-web --time  # 带 Web 控制台
 pm2 save && pm2 startup
 
 # 方式二：系统 crontab 每天 09:30 跑一次（程序跑完即退出，最省资源）
@@ -306,19 +371,55 @@ Email not sent
 - 465 端口配 `SMTP_SECURE=true`，587 端口配 `false`（STARTTLS）；
 - 腾讯企业邮/QQ 邮箱要用**授权码**而不是登录密码；
 - 先看日志里 `SMTP 连接验证通过` 是否出现，再检查 `MAIL_TO` 是否填写；
-- 附件过大时会自动只发文字报告，可调大 `MAX_ATTACHMENT_MB`。
+- 附件过大时会自动只发文字报告，可调大 `MAX_ATTACHMENT_MB`；
+- 现在的错误日志会带上 SMTP 地址、端口、错误码和排查建议，按提示改即可。
 
-**5. 想先本地调试不想发邮件**
+**5. 报 `SMTP 连接/登录超时 (timeout 20000ms)` 怎么办**
+"SMTP connection/login timeout" — how to debug
+
+跑内置自检（也可以在 Web 控制台点「诊断 SMTP 连接」）：
+
+```bash
+npm run doctor:mail
+```
+
+它会逐层排查：**DNS 解析 → TCP/SSL 连通 → SMTP 握手(EHLO/能力) → 账号登录**，并在当前配置连不通时自动试同域名的其它常用端口（含补 `smtp.` 前缀），最后给出可用组合。常见结论：
+
+| 自检结果 | 原因 | 处理 |
+|---|---|---|
+| DNS 解析失败 | SMTP 地址写错 | 例如 QQ 邮箱应为 `smtp.qq.com`，腾讯企业邮为 `smtp.exmail.qq.com` |
+| `ETIMEDOUT`（当前组合超时，换 `smtp.` 前缀后连通） | 地址漏了 `smtp.` 前缀 | 把 host 改成 `smtp.xxx.com` |
+| `ETIMEDOUT`（所有端口都不通） | 本机/服务器防火墙、云厂商安全组、公司网络封了出口 25/465/587 | 放行出口端口，或改用 465/587 |
+| `ECONNREFUSED` | 端口没开放 | 换端口 / 换 SMTP 地址 |
+| `SSL wrong version number` | 加密方式不匹配 | 465 勾选 SSL，587 取消勾选 |
+| 登录返回 `535` | 账号或密码错误 | QQ/163/Gmail 必须用**授权码/应用专用密码**，账号写完整邮箱地址 |
+| 登录返回 `530` | 要先加密再登录 | 开启 SSL/STARTTLS |
+| 发信报 `No recipients defined` | 收件人不是合法邮箱（例如填了昵称） | 收件人填真实地址，如 `name@example.com`；保存配置时就会拦截非法地址 |
+
+> 提示：`exmail.qq.com`（网页地址）和 `smtp.exmail.qq.com`（发信地址）不是一回事，前者连 465 必然超时。
+
+**6. 想先本地调试不想发邮件**
 Debug without sending email
 
 `npm run dry-run`：只截图、写 `report.txt`，不发信。
 
-**6. 邮件里的图片看不到**
+**7. 邮件里的图片看不到**
 Images not visible in the mail
 
 图片以 `cid` 内嵌，部分邮件客户端（如某些 Exchange/OWA）会拦截；此时附件里仍有 `report.txt` 与原始 PNG 可下载。
 
-**7. 之前的 `pup.js` 去哪了？**
+**8. Web 控制台打不开 / 端口被占用**
+Web dashboard won't open / port in use
+
+改端口：`WEB_PORT=4000 npm run web`（或写入 `.env`）。端口被占用时换一个即可。
+局域网访问需 `WEB_HOST=0.0.0.0`；暴露到公网请设置 `WEB_USER` / `WEB_PASS`。
+
+**9. 界面改了配置没生效？**
+Changes from the UI don't apply
+
+界面配置保存在 `data/config.json` 且优先级高于 `.env`：若 `.env` 里也写了同一项，以界面为准；删掉 `data/config.json` 即回到 `.env` 配置。
+
+**10. 之前的 `pup.js` 去哪了？**
 Where is `pup.js`?
 
 v2 已重构为模块化结构，入口改为 `src/index.js`，用法见[迁移说明](#从-v1pupjs-迁移--migrating-from-v1)。

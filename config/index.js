@@ -5,6 +5,8 @@ require('dotenv').config()
 const fs = require('fs')
 const path = require('path')
 
+const { invalidAddresses, isAddress, isEmail, isValidTimeZone, isValidCron, isValidUrl, isInt } = require('../src/utils')
+
 const ROOT = path.resolve(__dirname, '..')
 
 const toNum = (value, fallback) => {
@@ -96,9 +98,16 @@ const config = {
     retries: toNum(process.env.MAIL_RETRIES, 3),
     timeoutMs: toNum(process.env.SMTP_TIMEOUT, 20000)
   },
+  web: {
+    port: toNum(process.env.WEB_PORT, 3000),
+    host: process.env.WEB_HOST || '127.0.0.1',
+    // 设置了 WEB_USER 才会开启基础认证（建议公网部署时开启）
+    user: process.env.WEB_USER || '',
+    pass: process.env.WEB_PASS || ''
+  },
   log: {
     level: process.env.LOG_LEVEL || 'info',
-    file: process.env.LOG_FILE ? path.resolve(ROOT, process.env.LOG_FILE) : null
+    file: process.env.LOG_FILE === '' ? null : path.resolve(ROOT, process.env.LOG_FILE || 'logs/run.log')
   },
   sites: loadSites()
 }
@@ -111,12 +120,21 @@ config.mail.enabled = Boolean(config.mail.host && config.mail.user && config.mai
  * Pre-flight validation: errors abort, warnings only inform.
  */
 function validate(cfg = config) {
-  const errors = []
-  const warnings = []
+  const { errors, warnings } = { errors: [], warnings: [] }
 
-  if (!/^(\S+\s+){4}\S+$/.test(cfg.schedule.cron.trim())) {
+  if (!isValidCron(cfg.schedule.cron)) {
     errors.push(`SCHEDULE_CRON 不是合法的 5 段 cron 表达式：${cfg.schedule.cron}`)
   }
+  if (!isValidTimeZone(cfg.schedule.timezone)) {
+    errors.push(`SCHEDULE_TIMEZONE 不是合法时区：${cfg.schedule.timezone}（例如 Asia/Shanghai）`)
+  }
+
+  cfg.sites.forEach((site, index) => {
+    const label = `站点 #${index + 1} ${site.key || ''}`.trim()
+    if (!isValidUrl(site.url)) errors.push(`${label}：URL 必须以 http:// 或 https:// 开头且包含域名（${site.url}）`)
+    if (!isInt(site.viewport.width, 320, 3840)) errors.push(`${label}：视口宽度需在 320~3840（${site.viewport.width}）`)
+    if (!isInt(site.viewport.height, 320, 4320)) errors.push(`${label}：视口高度需在 320~4320（${site.viewport.height}）`)
+  })
   if (!cfg.sites.length) errors.push('没有配置任何截图站点')
 
   if (!cfg.mail.enabled) {
@@ -128,7 +146,27 @@ function validate(cfg = config) {
   if (cfg.mail.enabled && !cfg.mail.from) {
     errors.push('缺少 MAIL_FROM 发件人')
   }
+  for (const bad of invalidAddresses(cfg.mail.to)) errors.push(`收件人不是合法邮箱地址：${bad}（MAIL_TO）`)
+  for (const bad of invalidAddresses(cfg.mail.cc)) errors.push(`抄送不是合法邮箱地址：${bad}（MAIL_CC）`)
+  if (cfg.mail.from && !isAddress(cfg.mail.from)) errors.push(`发件人不是合法邮箱地址：${cfg.mail.from}（MAIL_FROM）`)
+  if (cfg.mail.user && !isEmail(cfg.mail.user)) errors.push(`SMTP 账号应填写完整邮箱地址：${cfg.mail.user}（SMTP_USER）`)
+  if (!cfg.mail.enabled && cfg.mail.user && cfg.mail.pass && !cfg.mail.to.length) {
+    warnings.push('已配置 SMTP 账号但没有收件人（MAIL_TO / 界面「收件人」），当前只截图不发邮件。')
+  }
+
+  if (cfg.mail.enabled && !/^smtp[.-]/i.test(cfg.mail.host)) {
+    warnings.push(
+      `SMTP_HOST="${cfg.mail.host}" 不像标准 SMTP 地址（通常形如 smtp.qq.com / smtp.exmail.qq.com）；` +
+        '地址写错时最常见的表现就是「SMTP 连接/登录超时」。' +
+        'Host does not look like an SMTP hostname; wrong host usually surfaces as a connection timeout.'
+    )
+  }
   return { errors, warnings }
 }
 
-module.exports = { config, validate, ROOT }
+// 界面保存的配置（data/config.json）优先级高于环境变量
+// Config saved from the web UI (data/config.json) takes precedence over env vars
+const store = require('../src/store')
+store.apply(config, store.read())
+
+module.exports = { config, validate, ROOT, store }
