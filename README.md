@@ -29,6 +29,7 @@
 - [常见问题 / FAQ & Troubleshooting](#常见问题--faq--troubleshooting)
 - [从 v1（pup.js）迁移 / Migrating from v1](#从-v1pupjs-迁移--migrating-from-v1)
 - [更新日志 / Changelog](#更新日志--changelog)
+- [赞助支持 / Sponsor](#赞助支持--sponsor)
 - [License](#license)
 
 ---
@@ -499,6 +500,22 @@ v2 已重构为模块化结构，入口改为 `src/index.js`，用法见[迁移�
 - 截图链路补齐：超时、重试、失败降级、空白页检测、并发控制、资源释放、历史归档与自动清理。
 
 ---
+
+## 赞助支持 / Sponsor
+
+如果这个项目帮到了你，欢迎请作者喝杯咖啡 ☕ 每一笔支持都会用于项目的持续维护与新功能开发。
+If this project saved you some time, consider buying me a coffee ☕ Every contribution goes towards maintenance and new features.
+
+<p align="center">
+  <img src="assets/alipay-qr.jpg" alt="支付宝收款码 / Alipay QR code" width="300">
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="assets/wechat-qr.jpg" alt="微信收款码 / WeChat Pay QR code" width="300">
+</p>
+
+<p align="center"><b>支付宝 Alipay</b> &nbsp;·&nbsp; <b>微信支付 WeChat Pay</b></p>
+
+> 点个 ⭐ Star 也是很大的鼓励。
+> A ⭐ star is equally appreciated.
 
 ## License
 
